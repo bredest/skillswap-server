@@ -4,12 +4,12 @@ const cookieParser = require('cookie-parser');
 const mongoose = require('mongoose');
 
 // Import routes
-const authRoutes = require('./routes/auth');
-const taskRoutes = require('./routes/tasks');
-const proposalRoutes = require('./routes/proposals');
-const paymentRoutes = require('./routes/payments');
-const reviewRoutes = require('./routes/reviews');
-const userRoutes = require('./routes/users');
+const authRoutes = require('../routes/auth');
+const taskRoutes = require('../routes/tasks');
+const proposalRoutes = require('../routes/proposals');
+const paymentRoutes = require('../routes/payments');
+const reviewRoutes = require('../routes/reviews');
+const userRoutes = require('../routes/users');
 
 const app = express();
 
