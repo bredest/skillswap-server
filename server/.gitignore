@@ -1,6 +1,0 @@
-.vercel
-.env.local
-.env
-.env.local.example
-node_modules
-.env.example
