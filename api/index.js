@@ -22,7 +22,6 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-// Health
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
@@ -32,7 +31,6 @@ mongoose.connect(process.env.MONGODB_URI || '', { serverSelectionTimeoutMS: 5000
   .then(() => console.log('MongoDB Connected'))
   .catch(() => {});
 
-// Mount routes
 app.use(authRoutes);
 app.use(taskRoutes);
 app.use(proposalRoutes);
@@ -40,7 +38,6 @@ app.use(paymentRoutes);
 app.use(reviewRoutes);
 app.use(userRoutes);
 
-// 404 catch-all - MUST be last
 app.use((req, res) => {
   res.status(404).json({ message: 'Not found' });
 });
