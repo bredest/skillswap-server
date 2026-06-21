@@ -1,18 +1,4 @@
 {
-  "version": 2,
-  "name": "skillswap-server",
-  "builds": [
-    {
-      "src": "index.js",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "index.js"
-    }
-  ],
   "functions": {
     "index.js": {
       "maxDuration": 30
