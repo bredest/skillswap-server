@@ -2,19 +2,18 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const mongoose = require('mongoose');
-const serverless = require('serverless-http');
 
 // Import routes
-const authRoutes = require('../routes/auth');
-const taskRoutes = require('../routes/tasks');
-const proposalRoutes = require('../routes/proposals');
-const paymentRoutes = require('../routes/payments');
-const reviewRoutes = require('../routes/reviews');
-const userRoutes = require('../routes/users');
+const authRoutes = require('./routes/auth');
+const taskRoutes = require('./routes/tasks');
+const proposalRoutes = require('./routes/proposals');
+const paymentRoutes = require('./routes/payments');
+const reviewRoutes = require('./routes/reviews');
+const userRoutes = require('./routes/users');
 
 const app = express();
 
-// CORS — allow your deployed frontend
+// CORS
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:3000',
   'https://skillswap-client-seven.vercel.app',
@@ -36,7 +35,6 @@ app.use(cors({
 }));
 
 app.options('*', cors());
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -54,35 +52,36 @@ app.use(paymentRoutes);
 app.use(reviewRoutes);
 app.use(userRoutes);
 
-// 404
 app.use((req, res) => {
-  res.status(404).json({ message: `Route ${req.method} ${req.originalUrl} not found` });
+  res.status(404).json({ message: 'Not found' });
 });
 
-// Error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(err.status || 500).json({ message: err.message || 'Internal Server Error' });
 });
 
-// Connect to MongoDB once (reuse connection across invocations)
-let isConnected = false;
+// MongoDB connection with timeout
+let dbReady = false;
 const connectDB = async () => {
-  if (isConnected) return;
+  if (dbReady) return;
   try {
-    await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 10000,
-    });
-    isConnected = true;
+    await Promise.race([
+      mongoose.connect(process.env.MONGODB_URI, {
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 10000,
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('MongoDB timeout')), 8000)),
+    ]);
+    dbReady = true;
     console.log('MongoDB Connected');
   } catch (error) {
-    console.error('MongoDB Error:', error.message);
+    console.error('MongoDB connection skipped:', error.message);
   }
 };
 
-// Vercel serverless handler
+// Vercel handler
 module.exports = async (req, res) => {
   await connectDB();
-  return serverless(app)(req, res);
+  return app(req, res);
 };
