@@ -1,0 +1,10 @@
+{
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/server/api/index.js" }
+  ],
+  "functions": {
+    "server/api/index.js": {
+      "maxDuration": 30
+    }
+  }
+}
