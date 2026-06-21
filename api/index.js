@@ -39,10 +39,19 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Health check
+// Health check - MUST be first, before any middleware
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// MongoDB - connect in background, don't block requests
+let dbReady = false;
+mongoose.connect(process.env.MONGODB_URI || '', {
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 10000,
+})
+  .then(() => { dbReady = true; console.log('MongoDB Connected'); })
+  .catch(() => { console.log('MongoDB not available, running without DB'); });
 
 // Routes
 app.use(authRoutes);
@@ -61,27 +70,5 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ message: err.message || 'Internal Server Error' });
 });
 
-// MongoDB connection with timeout
-let dbReady = false;
-const connectDB = async () => {
-  if (dbReady) return;
-  try {
-    await Promise.race([
-      mongoose.connect(process.env.MONGODB_URI, {
-        serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 10000,
-      }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('MongoDB timeout')), 8000)),
-    ]);
-    dbReady = true;
-    console.log('MongoDB Connected');
-  } catch (error) {
-    console.error('MongoDB connection skipped:', error.message);
-  }
-};
-
 // Vercel handler
-module.exports = async (req, res) => {
-  await connectDB();
-  return app(req, res);
-};
+module.exports = app;
