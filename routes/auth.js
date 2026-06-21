@@ -218,4 +218,83 @@ authRouter.post('/api/auth/logout', (req, res) => {
   res.json({ message: 'Logged out successfully' });
 });
 
+// Google OAuth - redirect to Google
+authRouter.get('/api/auth/google', (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+    `client_id=${process.env.GOOGLE_CLIENT_ID}` +
+    `&redirect_uri=${encodeURIComponent(process.env.BETTER_AUTH_URL || 'http://localhost:5000')}/api/auth/google/callback` +
+    `&response_type=code` +
+    `&scope=openid%20email%20profile` +
+    `&state=${encodeURIComponent(frontendUrl)}`;
+  res.redirect(googleAuthUrl);
+});
+
+// Google OAuth callback
+authRouter.get('/api/auth/google/callback', async (req, res) => {
+  try {
+    const { code, state } = req.query;
+    const frontendUrl = decodeURIComponent(state || 'http://localhost:3000');
+
+    if (!code) {
+      return res.redirect(`${frontendUrl}/login?error=Google+auth+failed`);
+    }
+
+    // Exchange code for tokens
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code,
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        redirect_uri: `${process.env.BETTER_AUTH_URL || 'http://localhost:5000'}/api/auth/google/callback`,
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    const tokens = await tokenRes.json();
+    if (!tokens.access_token) {
+      return res.redirect(`${frontendUrl}/login?error=Google+token+exchange+failed`);
+    }
+
+    // Get user info
+    const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+    const googleUser = await userRes.json();
+
+    if (!googleUser.email) {
+      return res.redirect(`${frontendUrl}/login?error=Google+user+info+failed`);
+    }
+
+    // Find or create user
+    let user = await User.findOne({ email: googleUser.email });
+
+    if (user) {
+      if (user.isBlocked) {
+        return res.redirect(`${frontendUrl}/login?error=Account+blocked`);
+      }
+    } else {
+      user = await User.create({
+        name: googleUser.name || googleUser.email.split('@')[0],
+        email: googleUser.email,
+        image: googleUser.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(googleUser.name || 'User')}`,
+        role: 'client',
+        password: await bcrypt.hash(Math.random().toString(36).slice(-12), 10),
+      });
+    }
+
+    // Create JWT session
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+    // Redirect to frontend with token
+    res.redirect(`${frontendUrl}/login?token=${token}&email=${encodeURIComponent(user.email)}`);
+  } catch (error) {
+    console.error('Google OAuth error:', error);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    res.redirect(`${frontendUrl}/login?error=Google+auth+error`);
+  }
+});
+
 module.exports = authRouter;
